@@ -129,6 +129,14 @@ document.getElementById('run-crawl').addEventListener('click', function () {
 
             resultsDiv.innerHTML = '';
 
+
+            // ✅ If there's no `data.data`, show a message instead of crashing
+            if (!data.data || !Array.isArray(data.data)) {
+                resultsDiv.innerHTML = `<p>${data.message || 'Crawl started, but no data available yet.'}</p>`;
+                return;
+            }
+
+
             if (data.data.length === 0) {
                 resultsDiv.innerHTML = '<p>No broken links found.</p>';
             } else {

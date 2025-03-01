@@ -31,6 +31,7 @@ class BrokenLinksController extends Controller
         return $this->asJson([
             'success' => true,
             'message' => 'Crawl has started. You can monitor progress in Utilities > Queue Manager.',
+            'data' => [],
         ]);
     }
 }
