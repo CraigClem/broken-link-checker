@@ -2,142 +2,141 @@
 
 namespace craigclement\craftbrokenlinks\services;
 
-// Import required libraries
-use Craft;                           // Craft CMS core class
-use GuzzleHttp\Client;              // Guzzle HTTP client for making web requests
-use yii\base\Component;             // Base class for creating Craft services
+use Craft;
+use GuzzleHttp\Client;
+use yii\base\Component;
+use craft\queue\Queue;
+use craigclement\craftbrokenlinks\jobs\CheckBrokenLinksJob;
 
 /**
- * Service to check for broken links in Craft CMS entries.
+ * Service for handling broken link detection in Craft CMS.
  */
 class BrokenLinksService extends Component
 {
     /**
-     * Crawl the entire website for broken links.
-     *
-     * @param string $baseUrl The base URL of the website.
-     * @return array List of broken links found.
+     * Add entries to the queue to be processed in batches.
      */
-    public function crawlSite(string $baseUrl): array
+    public function queueCrawl(): void
     {
-        // Create an HTTP client with a 5-second timeout
-        $client = new Client(['timeout' => 5]); 
-        $brokenLinks = [];  // Store broken links
-        $visitedUrls = [];  // Track visited pages to avoid duplicates
+        $entries = Craft::$app->elements->createElementQuery(\craft\elements\Entry::class)
+            ->with(['*']) // Load all relations
+            ->all();
 
-        // Log the start of the crawling process
-        Craft::info("Starting crawl for base URL: $baseUrl", __METHOD__);
+        if (!$entries) {
+            Craft::info("No entries found for crawling.", __METHOD__);
+            return;
+        }
 
-        try {
-            // Get all pages (entries) from Craft CMS
-            $entries = Craft::$app->elements->createElementQuery(\craft\elements\Entry::class)
-                ->with(['*'])   // Load all related fields
-                ->all();        // Fetch all results
+        $batchSize = 5; // Process 5 entries per job (can be configurable)
+        $batches = array_chunk($entries, $batchSize);
 
-            Craft::info("Found " . count($entries) . " entries to crawl.", __METHOD__);
+        foreach ($batches as $batch) {
+            Craft::$app->queue->push(new CheckBrokenLinksJob([
+                'entries' => $batch,
+            ]));
+        }
 
-            // Loop through each entry (page)
-            foreach ($entries as $entry) {
-                $url = $entry->getUrl();  // Get the page's URL
+        Craft::info("Queued " . count($batches) . " jobs for crawling broken links.", __METHOD__);
+    }
 
-                // Skip if no URL or already visited
-                if (!$url || in_array($url, $visitedUrls)) {
-                    Craft::info("Skipping entry ID: {$entry->id} - URL: $url", __METHOD__);
-                    continue; 
-                }
+    /**
+     * Process a batch of entries to find broken links.
+     *
+     * @param array $entries Batch of Craft entries to scan.
+     * @return array List of broken links.
+     */
+    public function processEntries(array $entries): array
+    {
+        $client = new Client(['timeout' => 5]);
+        $brokenLinks = [];
+        $visitedUrls = [];
 
-                // Mark the URL as visited
-                $visitedUrls[] = $url;
+        foreach ($entries as $entry) {
+            $url = $entry->getUrl();
 
-                // Check all links on the current page
-                $this->crawlPage($client, $url, $brokenLinks, $visitedUrls, $entry);
+            if (!$url || in_array($url, $visitedUrls)) {
+                continue;
             }
 
-            // Return the list of broken links found
-            return $brokenLinks;
-        } catch (\Throwable $e) {
-            // Log and rethrow any errors encountered
-            Craft::error("Error during crawl: " . $e->getMessage(), __METHOD__);
-            throw $e;
+            $visitedUrls[] = $url;
+
+            // Process this entry’s fields for links
+            $this->processEntryLinks($client, $entry, $url, $brokenLinks);
+        }
+
+        return $brokenLinks;
+    }
+
+    /**
+     * Process a single entry's fields to extract and check links.
+     */
+    private function processEntryLinks(Client $client, $entry, string $pageUrl, array &$brokenLinks): void
+    {
+        // Get all fields dynamically
+        $fieldLayout = $entry->getFieldLayout();
+        if (!$fieldLayout) {
+            return;
+        }
+
+        foreach ($fieldLayout->getCustomFields() as $field) {
+            $fieldHandle = $field->handle;
+            $fieldContent = $entry->getFieldValue($fieldHandle);
+
+            if (!$fieldContent) {
+                continue;
+            }
+
+            // Extract links from field content
+            preg_match_all('/<a\s+[^>]*href="([^"]*)"/i', (string)$fieldContent, $matches);
+            $urls = $matches[1] ?? [];
+
+            foreach ($urls as $url) {
+                $this->checkLink($client, $url, $entry, $fieldHandle, $pageUrl, $brokenLinks);
+            }
         }
     }
 
     /**
-     * Check all links on a specific page.
-     *
-     * @param Client $client HTTP client for making requests.
-     * @param string $url The page URL being crawled.
-     * @param array &$brokenLinks Reference to the broken links list.
-     * @param array &$visitedUrls Reference to the visited URLs list.
-     * @param \craft\elements\Entry|null $entry Optional entry for context.
+     * Check if a link is broken and add it to the list if needed.
      */
-    private function crawlPage(Client $client, string $url, array &$brokenLinks, array &$visitedUrls, $entry = null): void
+    private function checkLink(Client $client, string $link, $entry, string $field, string $pageUrl, array &$brokenLinks): void
     {
+        $absoluteUrl = $this->resolveUrl($pageUrl, $link);
+
+        if (!preg_match('/^https?:\/\//', $absoluteUrl)) {
+            return;
+        }
+
         try {
-            // Fetch the page's content
-            $response = $client->get($url);
-            $html = $response->getBody()->getContents();
+            $response = $client->head($absoluteUrl);
 
-            // Extract all <a> tags and their URLs from the page
-            preg_match_all('/<a\s+(?:[^>]*?\s+)?href="([^"]*)".*?>(.*?)<\/a>/is', $html, $matches);
-            $urls = $matches[1] ?? [];      // Extracted links
-            $linkTexts = $matches[2] ?? []; // Extracted link text
-
-            // Loop through each found link
-            foreach ($urls as $index => $link) {
-                // Create the absolute URL based on the current page's URL
-                $absoluteUrl = $this->resolveUrl($url, $link);
-                $linkText = strip_tags(trim($linkTexts[$index] ?? ''));
-
-                // Skip if not an external or internal HTTP/HTTPS link
-                if (!preg_match('/^https?:\/\//', $absoluteUrl)) {
-                    continue;
-                }
-
-                try {
-                    // Send a HEAD request to check if the link works
-                    $response = $client->head($absoluteUrl);
-
-                    // Check if the link is broken (error code 400 and above)
-                    if ($response->getStatusCode() >= 400) {
-                        $brokenLinks[] = [
-                            'url' => $absoluteUrl,
-                            'status' => 'Broken (' . $response->getStatusCode() . ')',
-                            'entryId' => $entry?->id,
-                            'entryTitle' => $entry?->title ?? $entry?->slug ?? 'N/A',
-                            'entryUrl' => $entry ? $entry->getCpEditUrl() : null,
-                            'linkText' => $linkText, 
-                            'field' => 'todo',  // Placeholder for future field data
-                            'pageUrl' => $url,
-                        ];
-                    }
-                } catch (\Throwable $e) {
-                    // Add unreachable links to the broken list
-                    $brokenLinks[] = [
-                        'url' => $absoluteUrl,
-                        'status' => 'Unreachable',
-                        'error' => $e->getMessage(),
-                        'entryId' => $entry?->id,
-                        'entryTitle' => $entry?->title ?? $entry?->slug ?? 'N/A',
-                        'entryUrl' => $entry ? $entry->getCpEditUrl() : null,
-                        'linkText' => $linkText,
-                        'field' => 'todo',  // Placeholder for future field data
-                        'pageUrl' => $url,
-                    ];
-                }
+            if ($response->getStatusCode() >= 400) {
+                $brokenLinks[] = [
+                    'url' => $absoluteUrl,
+                    'status' => 'Broken (' . $response->getStatusCode() . ')',
+                    'entryId' => $entry->id,
+                    'entryTitle' => $entry->title ?? $entry->slug,
+                    'entryUrl' => $entry->getCpEditUrl(),
+                    'field' => $field,
+                    'pageUrl' => $pageUrl,
+                ];
             }
         } catch (\Throwable $e) {
-            // Log any errors during crawling
-            Craft::error("Error crawling page URL: $url - " . $e->getMessage(), __METHOD__);
+            $brokenLinks[] = [
+                'url' => $absoluteUrl,
+                'status' => 'Unreachable',
+                'error' => $e->getMessage(),
+                'entryId' => $entry->id,
+                'entryTitle' => $entry->title ?? $entry->slug,
+                'entryUrl' => $entry->getCpEditUrl(),
+                'field' => $field,
+                'pageUrl' => $pageUrl,
+            ];
         }
     }
 
     /**
-     * Resolve a relative link into an absolute URL.
-     *
-     * @param string $baseUrl The page's base URL.
-     * @param string $relativeUrl The link's relative URL.
-     * @return string The resolved absolute URL.
+     * Resolve a relative URL into an absolute URL.
      */
     private function resolveUrl(string $baseUrl, string $relativeUrl): string
     {
