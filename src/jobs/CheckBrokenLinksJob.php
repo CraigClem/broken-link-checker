@@ -10,12 +10,18 @@ class CheckBrokenLinksJob extends BaseJob
 {
     public function execute($queue): void
     {
-        $service = Craft::$app->getModule('brokenlinks')->get('brokenLinksService');
+        // ✅ Retrieve the service properly from the registered service in Plugin.php
+        $service = Craft::$app->get('brokenLinksService');
 
-        // Get stored URLs
+        if (!$service instanceof BrokenLinksService) {
+            Craft::error('BrokenLinksService not found in Craft::$app', __METHOD__);
+            return;
+        }
+
+        // ✅ Get stored URLs from cache
         $urls = Craft::$app->cache->get('brokenLinks_urls') ?? [];
 
-        // Process in batches (to prevent large jobs)
+        // ✅ Process in batches to prevent timeouts
         $batchSize = 10; // Configurable later
         $chunks = array_chunk($urls, $batchSize);
 
@@ -23,7 +29,7 @@ class CheckBrokenLinksJob extends BaseJob
             $service->checkUrlsForBrokenLinks($batch);
         }
 
-        // Remove cache after processing
+        // ✅ Clear cache after processing
         Craft::$app->cache->delete('brokenLinks_urls');
     }
 
