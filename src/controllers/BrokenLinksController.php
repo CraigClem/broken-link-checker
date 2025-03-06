@@ -25,13 +25,29 @@ class BrokenLinksController extends Controller
      */
     public function actionRunCrawl()
     {
-        // Push the job to the queue
-        Craft::$app->queue->push(new CheckBrokenLinksJob());
-
+        $queue = Craft::$app->queue;
+    
+        // ✅ Log before adding to queue
+        Craft::info("Adding GenerateSitemapJob to queue", __METHOD__);
+    
+        // ✅ Add the first job (Generate Sitemap)
+        $jobId = $queue->push(new \craigclement\craftbrokenlinks\jobs\GenerateSitemapJob());
+    
+        if (!$jobId) {
+            Craft::error("Failed to add GenerateSitemapJob", __METHOD__);
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Failed to add job to queue.',
+            ]);
+        }
+    
+        Craft::info("Successfully added GenerateSitemapJob with ID: {$jobId}", __METHOD__);
+    
         return $this->asJson([
             'success' => true,
             'message' => 'Crawl has started. You can monitor progress in Utilities > Queue Manager.',
             'data' => [],
         ]);
     }
+    
 }
