@@ -5,20 +5,35 @@ namespace craigclement\craftbrokenlinks\jobs;
 use Craft;
 use craft\queue\BaseJob;
 use craigclement\craftbrokenlinks\services\BrokenLinksService;
+use craigclement\craftbrokenlinks\jobs\CheckBrokenLinksJob; // ✅ Ensure job reference is correct
 
 class GenerateSitemapJob extends BaseJob
 {
     public function execute($queue): void
     {
-        $service = Craft::$app->getModule('brokenlinks')->get('brokenLinksService');
+        // ✅ Get the plugin service correctly
+        $service = Craft::$app->get('brokenLinksService');
 
-        // Get all site URLs
-        $urls = $service->fetchAllSiteUrls(); // A new method we'll create
+        if (!$service instanceof BrokenLinksService) {
+            Craft::error('BrokenLinksService not found', __METHOD__);
+            return;
+        }
 
-        // Store in a Craft cache or database table for next job
+        // ✅ Get all site URLs
+        $urls = $service->fetchAllSiteUrls();
+
+        if (empty($urls)) {
+            Craft::warning('No URLs found for sitemap generation.', __METHOD__);
+            return;
+        }
+
+        // ✅ Store in cache for later processing
         Craft::$app->cache->set('brokenLinks_urls', $urls, 3600); // Cache for 1 hour
 
-        // Add the "Check Broken Links" job to queue
+        // ✅ Log before adding the next job
+        Craft::info('Sitemap generated successfully. Pushing CheckBrokenLinksJob to queue.', __METHOD__);
+
+        // ✅ Push the "Check Broken Links" job
         Craft::$app->queue->push(new CheckBrokenLinksJob());
     }
 
