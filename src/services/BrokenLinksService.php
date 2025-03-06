@@ -14,6 +14,32 @@ use craigclement\craftbrokenlinks\jobs\CheckBrokenLinksJob;
 class BrokenLinksService extends Component
 {
     /**
+     * Fetch all URLs from all sites in Craft CMS.
+     *
+     * @return array List of URLs.
+     */
+    public function fetchAllSiteUrls(): array
+    {
+        $urls = [];
+
+        // Get all sites in the system
+        $sites = Craft::$app->getSites()->getAllSites();
+
+        foreach ($sites as $site) {
+            // Get all entries for this site
+            $entries = Craft::$app->elements->createElementQuery(\craft\elements\Entry::class)
+                ->siteId($site->id)
+                ->all();
+
+            foreach ($entries as $entry) {
+                $urls[] = $entry->getUrl();
+            }
+        }
+
+        return array_filter($urls); // Remove any empty values
+    }
+
+    /**
      * Add entries to the queue to be processed in batches.
      */
     public function queueCrawl(): void
