@@ -69,6 +69,7 @@ public function actionRunCrawl()
     return $this->asJson([
         'success' => true,
         'message' => count($batches) . ' jobs added to queue.',
+        'data' => [],
     ]);
 }
 
