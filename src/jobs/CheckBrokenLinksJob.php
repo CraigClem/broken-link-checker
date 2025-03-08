@@ -20,14 +20,24 @@ class CheckBrokenLinksJob extends BaseJob
                 $response = $client->head($url);
                 if ($response->getStatusCode() >= 400) {
                     $brokenLinks[] = $url;
+                    Craft::info("Broken link detected: $url", __METHOD__);
                 }
             } catch (\Throwable $e) {
                 $brokenLinks[] = $url;
+                Craft::info("Request failed, marking as broken: $url", __METHOD__);
             }
         }
 
-        // Store broken links in cache for retrieval
-        Craft::$app->cache->set('broken_links_results', $brokenLinks, 3600);
+        // Log broken links before caching
+        if (!empty($brokenLinks)) {
+            Craft::info("Broken links found: " . json_encode($brokenLinks), __METHOD__);
+        } else {
+            Craft::info("No broken links found in this batch", __METHOD__);
+        }
+
+        // Store broken links in cache (with corrected key)
+        Craft::$app->cache->set('brokenLinks_results', $brokenLinks, 3600);
+        Craft::info('Stored broken links in cache', __METHOD__);
 
         Craft::info('Batch checked ' . count($this->urls) . ' URLs.', __METHOD__);
     }
