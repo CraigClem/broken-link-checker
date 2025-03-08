@@ -77,23 +77,15 @@ public function actionRunCrawl()
         // Set response format to JSON
         Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
 
-        // Retrieve cached broken links
+        // Retrieve cached broken links and sitemap URLs
         $brokenLinks = Craft::$app->cache->get('brokenLinks_results');
+        $sitemapUrls = Craft::$app->cache->get('brokenLinks_urls'); // Fetch sitemap URLs
 
-        // If no results are available yet, return a message
-        if (!$brokenLinks) {
-            return $this->asJson([
-                'success' => false,
-                'message' => 'Results are not ready yet. Try again later.',
-                'data' => []
-            ]);
-        }
-
-        // Return the broken links as JSON
         return $this->asJson([
-            'success' => true,
-            'message' => 'Broken links retrieved successfully.',
-            'data' => $brokenLinks
+            'success' => (bool) $brokenLinks,
+            'message' => $brokenLinks ? 'Broken links retrieved successfully.' : 'Results are not ready yet. Try again later.',
+            'data' => $brokenLinks ?? [],
+            'sitemap_urls' => $sitemapUrls ?? [], // Include sitemap URLs in response
         ]);
     }
     
