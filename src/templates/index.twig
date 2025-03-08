@@ -95,80 +95,103 @@
     document.getElementById('run-crawl').addEventListener('click', function () {
         const loading = document.getElementById('loading');
         const resultsDiv = document.getElementById('results');
-
-        // Show a loading message while the scan runs -> add loading spinner too
+    
+        // Show a loading message while the scan runs
         loading.textContent = 'Scanning... Please wait.';
-
-        // Make a request to the server-side action
+        resultsDiv.innerHTML = '';
+    
+        // Start the scan
         fetch('/brokenlinks/run-crawl')
-            .then(response => {
-                // Handle errors if the response is not OK
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json(); // Parse the JSON response
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('Broken links:', data);
-
-                // Clear any previous results and loading message
-                resultsDiv.innerHTML = '';
-                loading.textContent = '';
-
-                if (data.data.length === 0) {
-                    // Display a message if no broken links are found
-                    resultsDiv.innerHTML = '<p>No broken links found.</p>';
+                if (!data.success) {
+                    throw new Error(data.message);
+                }
+    
+                const jobId = data.jobId;
+                checkQueueStatus(jobId);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+                loading.textContent = ''; // Clear loading message
+            });
+    });
+    
+    /**
+     * Check the status of the queue job and fetch results when done.
+     */
+    function checkQueueStatus(jobId) {
+        fetch('/admin/utils/queue')
+            .then(response => response.text())
+            .then(text => {
+                if (text.includes(jobId)) {
+                    setTimeout(() => checkQueueStatus(jobId), 3000); // Check again in 3s
                 } else {
-                    // Create a table for displaying the results
-                    const table = document.createElement('table');
-                    table.innerHTML = `
-                        <thead>
-                            <tr>
-                                <th>Broken Link</th>
-                                <th>Link Text</th>
-                                <th>Field</th>
-                                <th>Page URL</th>
-                                <th>Entry</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.data
-                                .map(
-                                    link => `
-                                <tr>
-                                    <td>
-                                        <a href="${link.url}" target="_blank" class="action-link">${link.url}</a>
-                                    </td>
-                                    <td>${link.linkText || 'N/A'}</td>
-                                    <td>${link.field || 'todo'}</td>
-                                    <td>
-                                        <a href="${link.pageUrl}" target="_blank" class="action-link">
-                                            ${link.pageUrl.replace("{{ siteUrl }}", '') || '/'}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        ${
-                                            link.entryUrl
-                                                ? `<a href="${link.entryUrl}" target="_blank" class="action-link">${link.entryTitle || 'N/A'}</a>`
-                                                : 'N/A'
-                                        }
-                                    </td>
-                                </tr>
-                            `
-                                )
-                                .join('')}
-                        </tbody>
-                    `;
-                    resultsDiv.appendChild(table); // Append the results table
+                    fetchResults();
                 }
             })
             .catch(error => {
-                // Handle any fetch or processing errors
-                console.error('Error:', error);
-                resultsDiv.innerHTML = `<p>Error: ${error.message}</p>`;
-                loading.textContent = ''; // Clear the loading message on error
+                console.error('Queue check error:', error);
             });
-    });
+    }
+    
+    /**
+     * Fetch broken links once the job completes.
+     */
+    function fetchResults() {
+        fetch('/brokenlinks/get-results')
+            .then(response => response.json())
+            .then(data => {
+                const resultsDiv = document.getElementById('results');
+                const loading = document.getElementById('loading');
+    
+                loading.textContent = '';
+    
+                if (!data.success || data.data.length === 0) {
+                    resultsDiv.innerHTML = '<p>No broken links found.</p>';
+                    return;
+                }
+    
+                // Create table with results
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Broken Link</th>
+                            <th>Field</th>
+                            <th>Page URL</th>
+                            <th>Entry</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.data
+                            .map(
+                                link => `
+                            <tr>
+                                <td><a href="${link.url}" target="_blank">${link.url}</a></td>
+                                <td>${link.field || 'N/A'}</td>
+                                <td><a href="${link.pageUrl}" target="_blank">${link.pageUrl}</a></td>
+                                <td>
+                                    ${
+                                        link.entryUrl
+                                            ? `<a href="${link.entryUrl}" target="_blank">${link.entryTitle || 'N/A'}</a>`
+                                            : 'N/A'
+                                    }
+                                </td>
+                            </tr>
+                        `
+                            )
+                            .join('')}
+                    </tbody>
+                `;
+                resultsDiv.appendChild(table);
+            })
+            .catch(error => {
+                console.error('Fetch results error:', error);
+                resultsDiv.innerHTML = `<p>Error fetching results.</p>`;
+            });
+    }    
 </script>
 
 {% endblock %}

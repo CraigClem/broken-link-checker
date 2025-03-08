@@ -1,81 +1,63 @@
 <?php
 
-// Define the namespace for the controller
 namespace craigclement\craftbrokenlinks\controllers;
 
-// Import necessary Craft CMS and Yii components
 use craft\web\Controller;
-use craigclement\craftbrokenlinks\services\BrokenLinksService;
+use yii\web\Response;
 use Craft;
+use craigclement\craftbrokenlinks\jobs\GenerateSitemapJob;
 
-// Define the main controller class for managing broken links
 class BrokenLinksController extends Controller
 {
-    // Allow anonymous access to all actions in this controller
-    protected array|int|bool $allowAnonymous = true;
+    protected array|int|bool $allowAnonymous = false; // Restrict access to logged-in users
 
     /**
-     * **Index Action: Displays the main plugin page in the Control Panel.**
-     * 
-     * This action is triggered when visiting the `/brokenlinks` route in the CP.
-     * 
-     * @return string The rendered template.
+     * **Displays the main plugin page in the Control Panel.**
      */
-    public function actionIndex(): string
+    public function actionIndex(): Response
     {
-        // Render the `brokenlinks/index` template (Twig file)
         return $this->renderTemplate('brokenlinks/index');
     }
 
     /**
-     * **Run Crawl Action: Executes the link crawling process.**
-     * 
-     * This action is triggered when accessing the `/brokenlinks/run-crawl` route.
-     * It returns the results as a JSON response.
+     * **Start the scan by adding GenerateSitemapJob to the queue.**
      */
-    public function actionRunCrawl()
+    public function actionRunCrawl(): Response
     {
-        // Set the response format to JSON
-        Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
-    
-        // Get the base URL for the primary site
-        $baseUrl = Craft::$app->getSites()->getPrimarySite()->getBaseUrl();
-    
-        // Allow an override from query params (optional)
-        $baseUrl = Craft::$app->request->getQueryParam('url', $baseUrl);
-    
-        // Validate the URL
-        if (!filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            return $this->asJson([
-                'success' => false,
-                'message' => 'Invalid URL provided.',
-            ], 400);
-        }
-    
-        try {
-            // Create an instance of the BrokenLinksService
-            $service = new BrokenLinksService();
-    
-            // Crawl the site and collect broken links
-            $brokenLinks = $service->crawlSite($baseUrl);
-    
-            // Return a successful JSON response with the results
+        Craft::info("Starting broken link scan request.", __METHOD__);
+
+        // Queue the first job (Generating Sitemap)
+        $queue = Craft::$app->queue;
+        $jobId = $queue->push(new GenerateSitemapJob());
+
+        if ($jobId) {
+            Craft::info("GenerateSitemapJob added to queue successfully.", __METHOD__);
+
             return $this->asJson([
                 'success' => true,
-                'message' => 'Crawl completed successfully.',
-                'data' => $brokenLinks,
+                'message' => 'Scan started! Please wait for results.',
+                'jobId' => $jobId
             ]);
-        } catch (\Throwable $e) {
-            // Log any errors encountered during the crawl
-            Craft::error("Error during crawl of {$baseUrl}: " . $e->getMessage(), __METHOD__);
-    
-            // Return an error response as JSON
-            return $this->asJson([
-                'success' => false,
-                'message' => 'An error occurred during the crawl.',
-                'error' => $e->getMessage(),
-            ], 500);
         }
+
+        Craft::error("Failed to add GenerateSitemapJob to queue.", __METHOD__);
+
+        return $this->asJson([
+            'success' => false,
+            'message' => 'Failed to start the scan. Try again later.'
+        ]);
     }
-    
+
+    /**
+     * **Fetch stored broken links from cache or database.**
+     */
+    public function actionGetResults(): Response
+    {
+        $results = Craft::$app->cache->get('brokenLinks_results') ?? [];
+
+        return $this->asJson([
+            'success' => true,
+            'data' => $results
+        ]);
+    }
 }
