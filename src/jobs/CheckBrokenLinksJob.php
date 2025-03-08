@@ -14,6 +14,8 @@ class CheckBrokenLinksJob extends BaseJob
     {
         $client = new Client(['timeout' => 5]);
         $brokenLinks = [];
+
+        Craft::info('Received urls for broken links check',  json_encode($this->urls), __METHOD__);
     
         foreach ($this->urls as $url) {
             try {
