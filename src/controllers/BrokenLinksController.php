@@ -77,5 +77,20 @@ class BrokenLinksController extends Controller
             ], 500);
         }
     }
+
+        /**
+     * **Queue Test Job Action: Confirms queue processing works.**
+     * 
+     * This action adds a simple test job to the queue.
+     */
+    public function actionQueueTestJob()
+    {
+        Craft::$app->queue->push(new \craigclement\craftbrokenlinks\jobs\TestJob());
+
+        return $this->asJson([
+            'success' => true,
+            'message' => 'Test job added to the queue.',
+        ]);
+    }
     
 }
