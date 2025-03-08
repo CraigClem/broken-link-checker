@@ -40,36 +40,13 @@ public function actionRunCrawl()
     // Set response format to JSON
     Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
 
-    // ✅ Retrieve the registered service instance properly from Craft's plugin system
-    $service = Plugin::getInstance()->get('brokenLinksService');
-
-    // ✅ Fetch all URLs from the site
-    $urls = $service->getAllSiteUrls();
-
-    // 🚨 Handle case where no URLs are found
-    if (empty($urls)) {
-        return $this->asJson([
-            'success' => false,
-            'message' => 'No URLs found for checking.',
-        ]);
-    }
-
-    // ✅ Define batch size (number of URLs checked per job)
-    $batchSize = 10; // Adjust as needed
-    $batches = array_chunk($urls, $batchSize); // Splits URLs into smaller chunks
-
-    // ✅ Push each batch as a separate queue job for asynchronous processing
-    foreach ($batches as $batch) {
-        Craft::$app->queue->push(new \craigclement\craftbrokenlinks\jobs\CheckBrokenLinksJob([
-            'urls' => $batch // Each job processes one batch of URLs
-        ]));
-    }
+    // ✅ Push the GenerateSitemapJob to queue
+    Craft::$app->queue->push(new \craigclement\craftbrokenlinks\jobs\GenerateSitemapJob());
 
     // ✅ Return JSON response confirming jobs were added to queue
     return $this->asJson([
         'success' => true,
-        'message' => count($batches) . ' jobs added to queue.',
-        'data' => [],
+        'message' => 'Sitemap generation started. Checking for broken links will begin soon.',
     ]);
 }
 
