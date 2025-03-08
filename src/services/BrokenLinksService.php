@@ -12,6 +12,30 @@ use yii\base\Component;             // Base class for creating Craft services
  */
 class BrokenLinksService extends Component
 {
+
+        /**
+     * Get all site URLs from Craft CMS entries.
+     *
+     * @return array List of all entry URLs.
+     */
+    public function getAllSiteUrls(): array
+    {
+        $urls = [];
+
+        // Fetch all entries in Craft CMS
+        $entries = Craft::$app->elements->createElementQuery(\craft\elements\Entry::class)
+            ->all();
+
+        foreach ($entries as $entry) {
+            if ($entry->getUrl()) {
+                $urls[] = $entry->getUrl();
+            }
+        }
+
+        return $urls;
+    }
+
+
     /**
      * Crawl the entire website for broken links.
      *

@@ -27,56 +27,51 @@ class BrokenLinksController extends Controller
         return $this->renderTemplate('brokenlinks/index');
     }
 
+
     /**
-     * **Run Crawl Action: Executes the link crawling process.**
-     * 
-     * This action is triggered when accessing the `/brokenlinks/run-crawl` route.
-     * It returns the results as a JSON response.
-     */
-    public function actionRunCrawl()
-    {
-        // Set the response format to JSON
-        Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
-    
-        // Get the base URL for the primary site
-        $baseUrl = Craft::$app->getSites()->getPrimarySite()->getBaseUrl();
-    
-        // Allow an override from query params (optional)
-        $baseUrl = Craft::$app->request->getQueryParam('url', $baseUrl);
-    
-        // Validate the URL
-        if (!filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            return $this->asJson([
-                'success' => false,
-                'message' => 'Invalid URL provided.',
-            ], 400);
-        }
-    
-        try {
-            // Create an instance of the BrokenLinksService
-            $service = new BrokenLinksService();
-    
-            // Crawl the site and collect broken links
-            $brokenLinks = $service->crawlSite($baseUrl);
-    
-            // Return a successful JSON response with the results
-            return $this->asJson([
-                'success' => true,
-                'message' => 'Crawl completed successfully.',
-                'data' => $brokenLinks,
-            ]);
-        } catch (\Throwable $e) {
-            // Log any errors encountered during the crawl
-            Craft::error("Error during crawl of {$baseUrl}: " . $e->getMessage(), __METHOD__);
-    
-            // Return an error response as JSON
-            return $this->asJson([
-                'success' => false,
-                'message' => 'An error occurred during the crawl.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+ * **Run Crawl Action: Executes the link checking process asynchronously using a queue.**
+ * 
+ * - This action is triggered when accessing `/brokenlinks/run-crawl`.
+ * - It fetches all site URLs and batches them into jobs for asynchronous processing.
+ * - The queue jobs will check links in smaller batches to prevent timeouts.
+ */
+public function actionRunCrawl()
+{
+    // Set response format to JSON
+    Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+    // ✅ Retrieve the registered service instance properly from Craft's plugin system
+    $service = Craft::$app->getModule('brokenlinks')->get('brokenLinksService');
+
+    // ✅ Fetch all URLs from the site
+    $urls = $service->getAllSiteUrls();
+
+    // 🚨 Handle case where no URLs are found
+    if (empty($urls)) {
+        return $this->asJson([
+            'success' => false,
+            'message' => 'No URLs found for checking.',
+        ]);
     }
+
+    // ✅ Define batch size (number of URLs checked per job)
+    $batchSize = 10; // Adjust as needed
+    $batches = array_chunk($urls, $batchSize); // Splits URLs into smaller chunks
+
+    // ✅ Push each batch as a separate queue job for asynchronous processing
+    foreach ($batches as $batch) {
+        Craft::$app->queue->push(new \craigclement\craftbrokenlinks\jobs\CheckBrokenLinksJob([
+            'urls' => $batch // Each job processes one batch of URLs
+        ]));
+    }
+
+    // ✅ Return JSON response confirming jobs were added to queue
+    return $this->asJson([
+        'success' => true,
+        'message' => count($batches) . ' jobs added to queue.',
+    ]);
+}
+
 
         /**
      * **Queue Test Job Action: Confirms queue processing works.**
