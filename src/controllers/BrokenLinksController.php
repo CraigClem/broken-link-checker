@@ -53,11 +53,20 @@ class BrokenLinksController extends Controller
      */
     public function actionGetResults(): Response
     {
-        $results = Craft::$app->cache->get('brokenLinks_results') ?? [];
-
+        $results = Craft::$app->cache->get('brokenLinks_results');
+    
+        if ($results === false || empty($results)) {
+            return $this->asJson([
+                'success' => true, // ✅ Keep success true, just no results yet
+                'message' => 'No results yet. Please check back later.',
+                'data' => [] 
+            ]);
+        }
+    
         return $this->asJson([
             'success' => true,
             'data' => $results
         ]);
     }
+    
 }
