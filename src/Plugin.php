@@ -39,6 +39,7 @@ class Plugin extends BasePlugin
                 $event->rules['brokenlinks'] = 'brokenlinks/broken-links/index';
                 $event->rules['brokenlinks/queue-test-job'] = 'brokenlinks/broken-links/queue-test-job';
                 $event->rules['brokenlinks/run-crawl'] = 'brokenlinks/broken-links/run-crawl';
+                $event->rules['brokenlinks/get-results'] = 'brokenlinks/broken-links/get-results';
                 
             }
         );
