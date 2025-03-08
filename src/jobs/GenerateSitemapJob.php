@@ -12,6 +12,7 @@ class GenerateSitemapJob extends BaseJob
     {
         Craft::info("Generating Sitemap for Broken Links", __METHOD__);
 
+        // Get the plugin instance and access the service
         $service = Craft::$app->get('brokenLinksService');
 
         if (!$service) {
