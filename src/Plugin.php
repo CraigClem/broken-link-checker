@@ -50,6 +50,7 @@ class Plugin extends BasePlugin
             function (RegisterUrlRulesEvent $event) {
                 // Define a front-end route for triggering the crawl action
                 $event->rules['brokenlinks/run-crawl'] = 'brokenlinks/broken-links/run-crawl';
+                $event->rules['brokenlinks/get-results'] = 'brokenlinks/broken-links/get-results';
             }
         );
 

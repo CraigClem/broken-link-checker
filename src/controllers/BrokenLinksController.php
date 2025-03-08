@@ -40,10 +40,10 @@ public function actionRunCrawl()
     // Set response format to JSON
     Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
 
-    // ✅ Push the GenerateSitemapJob to queue
+    // Push the GenerateSitemapJob to queue
     Craft::$app->queue->push(new \craigclement\craftbrokenlinks\jobs\GenerateSitemapJob());
 
-    // ✅ Return JSON response confirming jobs were added to queue
+    // Return JSON response confirming jobs were added to queue
     return $this->asJson([
         'success' => true,
         'message' => 'Sitemap generation started. Checking for broken links will begin soon.',
@@ -63,6 +63,37 @@ public function actionRunCrawl()
         return $this->asJson([
             'success' => true,
             'message' => 'Test job added to the queue.',
+        ]);
+    }
+
+    /**
+ * **Get Results Action: Fetches processed broken links from cache.**
+ *
+ * - This action is triggered when accessing `/brokenlinks/get-results`.
+ * - It retrieves the cached results and returns them as JSON.
+ */
+    public function actionGetResults()
+    {
+        // Set response format to JSON
+        Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        // Retrieve cached broken links
+        $brokenLinks = Craft::$app->cache->get('brokenLinks_results');
+
+        // If no results are available yet, return a message
+        if (!$brokenLinks) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Results are not ready yet. Try again later.',
+                'data' => []
+            ]);
+        }
+
+        // Return the broken links as JSON
+        return $this->asJson([
+            'success' => true,
+            'message' => 'Broken links retrieved successfully.',
+            'data' => $brokenLinks
         ]);
     }
     
