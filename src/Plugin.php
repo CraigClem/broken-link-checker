@@ -31,6 +31,7 @@ class Plugin extends BasePlugin
             function (RegisterUrlRulesEvent $event) {
                 // Define a CP route for the Broken Links plugin index page
                 $event->rules['brokenlinks'] = 'brokenlinks/broken-links/index';
+                $event->rules['brokenlinks/get-results'] = 'brokenlinks/broken-links/get-results';
             }
         );
 
