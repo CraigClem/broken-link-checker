@@ -38,6 +38,7 @@ class Plugin extends BasePlugin
                 // Define a CP route for the Broken Links plugin index page
                 $event->rules['brokenlinks'] = 'brokenlinks/broken-links/index';
                 $event->rules['brokenlinks/queue-test-job'] = 'brokenlinks/broken-links/queue-test-job';
+                $event->rules['brokenlinks/run-crawl'] = 'brokenlinks/broken-links/run-crawl';
                 
             }
         );
