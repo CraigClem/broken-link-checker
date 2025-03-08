@@ -18,23 +18,23 @@ class CheckBrokenLinksJob extends BaseJob
         Craft::info('Received urls for broken links check',  json_encode($this->urls), __METHOD__);
     
         foreach ($this->urls as $url) {
-            Craft::info("Checking URL: $url", __METHOD__);
             try {
-                $response = $client->head($url);
+                // Use GET request (not HEAD) to avoid servers incorrectly returning 200 for broken links
+                $response = $client->get($url, ['http_errors' => false]);
                 $statusCode = $response->getStatusCode();
-                
-                // Log each URL and its response
-                Craft::info("URL: $url | Status: $statusCode", __METHOD__);
+        
+                Craft::info("🔍 Checking URL: $url | Status Code: $statusCode", __METHOD__);
         
                 if ($statusCode >= 400) {
                     $brokenLinks[] = $url;
-                    Craft::info("Broken link detected: $url", __METHOD__);
+                    Craft::info("❌ Broken link detected: $url", __METHOD__);
                 }
             } catch (\Throwable $e) {
                 $brokenLinks[] = $url;
-                Craft::info("Request failed, marking as broken: $url", __METHOD__);
+                Craft::info("🚨 Request failed, marking as broken: $url | Error: " . $e->getMessage(), __METHOD__);
             }
         }
+        
         
     
         // Log the final list of broken links before caching
