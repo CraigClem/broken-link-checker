@@ -14,7 +14,7 @@ class CheckBrokenLinksJob extends BaseJob
     {
         $client = new Client(['timeout' => 5]);
         $brokenLinks = [];
-
+    
         foreach ($this->urls as $url) {
             try {
                 $response = $client->head($url);
@@ -27,20 +27,22 @@ class CheckBrokenLinksJob extends BaseJob
                 Craft::info("Request failed, marking as broken: $url", __METHOD__);
             }
         }
-
-        // Log broken links before caching
-        if (!empty($brokenLinks)) {
-            Craft::info("Broken links found: " . json_encode($brokenLinks), __METHOD__);
+    
+        // Log the final list of broken links before caching
+        Craft::info("Final broken links: " . json_encode($brokenLinks), __METHOD__);
+    
+        // Store broken links in cache
+        $cacheSet = Craft::$app->cache->set('brokenLinks_results', $brokenLinks, 3600);
+        
+        if ($cacheSet) {
+            Craft::info("✅ Successfully stored broken links in cache.", __METHOD__);
         } else {
-            Craft::info("No broken links found in this batch", __METHOD__);
+            Craft::warning("❌ Failed to store broken links in cache.", __METHOD__);
         }
-
-        // Store broken links in cache (with corrected key)
-        Craft::$app->cache->set('brokenLinks_results', $brokenLinks, 3600);
-        Craft::info('Stored broken links in cache', __METHOD__);
-
+    
         Craft::info('Batch checked ' . count($this->urls) . ' URLs.', __METHOD__);
     }
+    
 
     protected function defaultDescription(): string
     {
