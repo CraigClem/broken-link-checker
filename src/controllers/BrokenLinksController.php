@@ -9,10 +9,10 @@ use craigclement\craftbrokenlinks\jobs\GenerateSitemapJob;
 
 class BrokenLinksController extends Controller
 {
-    protected array|int|bool $allowAnonymous = false; // Restrict access to logged-in users
+    protected array|int|bool $allowAnonymous = false;
 
     /**
-     * **Displays the main plugin page in the Control Panel.**
+     * Displays the main plugin page in the Control Panel.
      */
     public function actionIndex(): Response
     {
@@ -20,15 +20,13 @@ class BrokenLinksController extends Controller
     }
 
     /**
-     * **Start the scan by adding GenerateSitemapJob to the queue.**
+     * Starts the scan by adding GenerateSitemapJob to the queue.
      */
     public function actionRunCrawl(): Response
     {
         Craft::info("Starting broken link scan request.", __METHOD__);
 
-        // Queue the first job (Generating Sitemap)
-        $queue = Craft::$app->queue;
-        $jobId = $queue->push(new GenerateSitemapJob());
+        $jobId = Craft::$app->queue->push(new GenerateSitemapJob());
 
         if ($jobId) {
             Craft::info("GenerateSitemapJob added to queue successfully.", __METHOD__);
@@ -49,24 +47,15 @@ class BrokenLinksController extends Controller
     }
 
     /**
-     * **Fetch stored broken links from cache or database.**
+     * Fetch stored broken links from cache or database.
      */
     public function actionGetResults(): Response
     {
-        $results = Craft::$app->cache->get('brokenLinks_results');
-    
-        if ($results === false || empty($results)) {
-            return $this->asJson([
-                'success' => true, // ✅ Keep success true, just no results yet
-                'message' => 'No results yet. Please check back later.',
-                'data' => [] 
-            ]);
-        }
-    
+        $results = Craft::$app->cache->get('brokenLinks_results') ?? [];
+
         return $this->asJson([
             'success' => true,
             'data' => $results
         ]);
     }
-    
 }

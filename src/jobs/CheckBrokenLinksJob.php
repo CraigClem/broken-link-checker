@@ -6,43 +6,40 @@ use Craft;
 use craft\queue\BaseJob;
 use GuzzleHttp\Client;
 
-/**
- * Job to check a batch of URLs for broken links.
- */
 class CheckBrokenLinksJob extends BaseJob
 {
-    public array $urls = []; // URLs to check
-
     public function execute($queue): void
     {
+        Craft::info("Checking broken links...", __METHOD__);
+
+        $urls = Craft::$app->cache->get('brokenLinks_urls') ?? [];
+
+        if (empty($urls)) {
+            Craft::warning('No URLs stored in cache.', __METHOD__);
+            return;
+        }
+
         $client = new Client(['timeout' => 5]);
         $brokenLinks = [];
 
-        foreach ($this->urls as $url) {
+        foreach ($urls as $url) {
             try {
                 $response = $client->head($url);
-
                 if ($response->getStatusCode() >= 400) {
-                    $brokenLinks[] = [
-                        'url' => $url,
-                        'status' => 'Broken (' . $response->getStatusCode() . ')'
-                    ];
+                    $brokenLinks[] = ['url' => $url, 'status' => $response->getStatusCode()];
                 }
             } catch (\Throwable $e) {
-                $brokenLinks[] = [
-                    'url' => $url,
-                    'status' => 'Unreachable',
-                    'error' => $e->getMessage()
-                ];
+                $brokenLinks[] = ['url' => $url, 'status' => 'Unreachable'];
             }
         }
 
-        // Store results in cache
         Craft::$app->cache->set('brokenLinks_results', $brokenLinks, 3600);
+
+        Craft::info('Broken link check completed.', __METHOD__);
     }
 
     protected function defaultDescription(): string
     {
-        return 'Checking broken links';
+        return Craft::t('app', 'Checking for Broken Links');
     }
 }

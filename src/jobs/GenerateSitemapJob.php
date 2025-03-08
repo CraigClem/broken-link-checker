@@ -6,38 +6,30 @@ use Craft;
 use craft\queue\BaseJob;
 use craigclement\craftbrokenlinks\jobs\CheckBrokenLinksJob;
 
-/**
- * Job to generate a sitemap of all site URLs for broken link checking.
- */
 class GenerateSitemapJob extends BaseJob
 {
     public function execute($queue): void
     {
-        Craft::info("Running GenerateSitemapJob...", __METHOD__);
+        Craft::info("Generating Sitemap for Broken Links", __METHOD__);
 
-        // Get all entries in the CMS
-        $entries = Craft::$app->elements->createElementQuery(\craft\elements\Entry::class)
-            ->all();
+        $service = Craft::$app->get('brokenLinksService');
 
-        if (!$entries) {
-            Craft::warning("No entries found for sitemap generation.", __METHOD__);
+        if (!$service) {
+            Craft::error('BrokenLinksService not found', __METHOD__);
             return;
         }
 
-        // Extract URLs from entries
-        $urls = [];
-        foreach ($entries as $entry) {
-            if ($entry->getUrl()) {
-                $urls[] = $entry->getUrl();
-            }
+        $urls = $service->fetchAllSiteUrls();
+
+        if (empty($urls)) {
+            Craft::warning('No URLs found for sitemap generation.', __METHOD__);
+            return;
         }
 
-        // Store URLs in cache for 1 hour
         Craft::$app->cache->set('brokenLinks_urls', $urls, 3600);
 
-        Craft::info("Stored " . count($urls) . " URLs in cache. Adding CheckBrokenLinksJob to queue.", __METHOD__);
+        Craft::info('Sitemap generated successfully. Pushing CheckBrokenLinksJob to queue.', __METHOD__);
 
-        // Push the CheckBrokenLinksJob
         Craft::$app->queue->push(new CheckBrokenLinksJob());
     }
 
