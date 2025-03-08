@@ -9,6 +9,7 @@ use craft\web\UrlManager;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\web\twig\variables\Cp;
 use yii\base\Event;
+use craigclement\craftbrokenlinks\services\BrokenLinksService;
 
 class Plugin extends BasePlugin
 {
@@ -18,11 +19,9 @@ class Plugin extends BasePlugin
     {
         parent::init();
 
-        // Register the BrokenLinksService as a component
-        Craft::$app->setComponents([
-            'brokenLinksService' => [
-                'class' => \craigclement\craftbrokenlinks\services\BrokenLinksService::class,
-            ],
+        // Register the BrokenLinksService correctly
+        $this->setComponents([
+            'brokenLinksService' => BrokenLinksService::class,
         ]);
 
         // Register CP routes
@@ -52,3 +51,4 @@ class Plugin extends BasePlugin
         Craft::info('Broken Links plugin loaded', __METHOD__);
     }
 }
+
