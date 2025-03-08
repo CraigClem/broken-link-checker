@@ -5,7 +5,7 @@ namespace craigclement\craftbrokenlinks\controllers;
 
 // Import necessary Craft CMS and Yii components
 use craft\web\Controller;
-use craigclement\craftbrokenlinks\services\BrokenLinksService;
+use craigclement\craftbrokenlinks\Plugin;
 use Craft;
 
 // Define the main controller class for managing broken links
@@ -41,7 +41,7 @@ public function actionRunCrawl()
     Craft::$app->response->format = \yii\web\Response::FORMAT_JSON;
 
     // ✅ Retrieve the registered service instance properly from Craft's plugin system
-    $service = Craft::$app->getModule('brokenlinks')->get('brokenLinksService');
+    $service = Plugin::getInstance()->get('brokenLinksService');
 
     // ✅ Fetch all URLs from the site
     $urls = $service->getAllSiteUrls();

@@ -24,6 +24,12 @@ class Plugin extends BasePlugin
         // Call the parent class's initialization method
         parent::init();
 
+
+        // Register the service
+        $this->setComponents([
+            'brokenLinksService' => \craigclement\craftbrokenlinks\services\BrokenLinksService::class,
+        ]);
+
         // Register a Control Panel (CP) route for the plugin's index page
         Event::on(
             UrlManager::class,                        // Target the CP URL manager
