@@ -18,6 +18,13 @@ class Plugin extends BasePlugin
     {
         parent::init();
 
+        // Register the BrokenLinksService as a component
+        Craft::$app->setComponents([
+            'brokenLinksService' => [
+                'class' => \craigclement\craftbrokenlinks\services\BrokenLinksService::class,
+            ],
+        ]);
+
         // Register CP routes
         Event::on(
             UrlManager::class,
