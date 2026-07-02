@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 - 2026-07-01
+
+### Fixed
+- Broken-link records are now pruned when a page is recrawled and a previously-broken link is fixed, instead of persisting in the report indefinitely until "Clear All Data" is used
+
 ## 1.1.0 - 2026-06-26
 
 ### Added
