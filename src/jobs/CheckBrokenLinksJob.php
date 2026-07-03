@@ -243,6 +243,8 @@ class CheckBrokenLinksJob extends BaseJob
                     ]);
                 }
             }
+
+            $this->pruneResolvedLinks($url, array_column($brokenLinks, 'url'));
         } catch (\Throwable $e) {
             Craft::error("Error crawling page URL: $url - " . $e->getMessage(), __METHOD__);
         }
@@ -281,6 +283,20 @@ class CheckBrokenLinksJob extends BaseJob
         }
 
         return false;
+    }
+
+    /**
+     * Removes stored broken-link rows for a page that are no longer broken,
+     * now that the page has been freshly recrawled.
+     */
+    private function pruneResolvedLinks(string $pageUrl, array $currentlyBrokenUrls): void
+    {
+        $condition = ['pageUrl' => $pageUrl];
+        if (!empty($currentlyBrokenUrls)) {
+            $condition = ['and', $condition, ['not in', 'url', $currentlyBrokenUrls]];
+        }
+
+        BrokenLinkRecord::deleteAll($condition);
     }
 
     /**
