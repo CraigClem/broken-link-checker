@@ -9,14 +9,13 @@ use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\helpers\UrlHelper;
 use craft\i18n\PhpMessageSource;
 use craft\services\Dashboard;
 use craft\services\UserPermissions;
-use craft\helpers\UrlHelper;
 use craft\web\twig\variables\Cp;
 use craft\web\UrlManager;
 use craigclement\craftbrokenlinks\console\controllers\BrokenLinksController as ConsoleBrokenLinksController;
-use craigclement\craftbrokenlinks\models\Settings;
 use craigclement\craftbrokenlinks\services\BrokenLinksService;
 use craigclement\craftbrokenlinks\widgets\BrokenLinksWidget;
 use yii\base\Event;
@@ -48,10 +47,12 @@ class Plugin extends BasePlugin
     /**
      * @var string The plugin's schema version, used to track migration state.
      */
-    public string $schemaVersion = '1.1.0';
+    public string $schemaVersion = '1.2.0';
 
     /**
-     * @var bool Whether the plugin has control-panel settings.
+     * @var bool Whether the plugin has control-panel settings. The Settings
+     * link redirects to the ignore-list page; nothing is stored in project
+     * config.
      */
     public bool $hasCpSettings = true;
 
@@ -148,23 +149,12 @@ class Plugin extends BasePlugin
         return $service;
     }
 
-    // Protected Methods
-    // =========================================================================
-
     /**
      * @inheritdoc
      */
     public function getSettingsResponse(): mixed
     {
         return Craft::$app->getResponse()->redirect(UrlHelper::cpUrl('brokenlinks/settings'));
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected function createSettingsModel(): Settings
-    {
-        return new Settings();
     }
 
     // Private Methods

@@ -7,6 +7,7 @@ use craigclement\craftbrokenlinks\jobs\GenerateSitemapJob;
 use craigclement\craftbrokenlinks\models\BrokenLink;
 use craigclement\craftbrokenlinks\models\ScanHistory;
 use craigclement\craftbrokenlinks\records\BrokenLinkRecord;
+use craigclement\craftbrokenlinks\records\IgnorePatternRecord;
 use craigclement\craftbrokenlinks\records\ScanHistoryRecord;
 use yii\base\Component;
 
@@ -149,5 +150,115 @@ class BrokenLinksService extends Component
             Craft::error('Error clearing broken links data: ' . $e->getMessage(), __METHOD__);
             return false;
         }
+    }
+
+    /**
+     * Get every ignore pattern, alphabetically.
+     *
+     * Broken-link URLs containing one of these patterns as a substring are
+     * skipped during scans.
+     *
+     * @return string[]
+     */
+    public function getIgnorePatterns(): array
+    {
+        return IgnorePatternRecord::find()
+            ->select(['pattern'])
+            ->orderBy(['pattern' => SORT_ASC])
+            ->column();
+    }
+
+    /**
+     * Replace the full set of ignore patterns with the given list.
+     *
+     * Patterns are trimmed, blanks dropped, and duplicates removed
+     * (case-insensitively) before saving.
+     *
+     * @param string[] $patterns
+     * @return bool Whether every pattern saved successfully.
+     */
+    public function saveIgnorePatterns(array $patterns): bool
+    {
+        $clean = [];
+        foreach ($patterns as $pattern) {
+            $pattern = trim($pattern);
+            if ($pattern === '') {
+                continue;
+            }
+            $clean[mb_strtolower($pattern)] = $pattern;
+        }
+
+        try {
+            IgnorePatternRecord::deleteAll();
+
+            foreach ($clean as $pattern) {
+                $record = new IgnorePatternRecord();
+                $record->pattern = $pattern;
+                if (!$record->save()) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Craft::error('Error saving ignore patterns: ' . $e->getMessage(), __METHOD__);
+            return false;
+        }
+    }
+
+    /**
+     * Add a single ignore pattern if it isn't already present.
+     *
+     * @return bool Whether the pattern exists after the call.
+     */
+    public function addIgnorePattern(string $pattern): bool
+    {
+        $pattern = trim($pattern);
+        if ($pattern === '') {
+            return false;
+        }
+
+        if (IgnorePatternRecord::find()->where(['pattern' => $pattern])->exists()) {
+            return true;
+        }
+
+        $record = new IgnorePatternRecord();
+        $record->pattern = $pattern;
+
+        return $record->save();
+    }
+
+    /**
+     * Delete stored broken-link rows whose URL is on the given host.
+     *
+     * Candidates are pre-filtered with a LIKE query, then matched on the
+     * exact parsed hostname so `example.com` doesn't also remove rows for
+     * `example.com.evil.net`.
+     *
+     * @return int The number of rows removed.
+     */
+    public function deleteBrokenLinksForHost(string $host): int
+    {
+        $host = mb_strtolower($host);
+
+        $candidates = BrokenLinkRecord::find()
+            ->select(['id', 'url'])
+            ->where(['like', 'url', $host])
+            ->asArray()
+            ->all();
+
+        $ids = [];
+        foreach ($candidates as $candidate) {
+            $candidateHost = parse_url($candidate['url'], PHP_URL_HOST);
+            if ($candidateHost !== null && mb_strtolower((string)$candidateHost) === $host) {
+                $ids[] = $candidate['id'];
+            }
+        }
+
+        if (!$ids) {
+            return 0;
+        }
+
+        return BrokenLinkRecord::deleteAll(['id' => $ids]);
     }
 }

@@ -4,7 +4,6 @@ namespace craigclement\craftbrokenlinks\controllers;
 
 use Craft;
 use craft\web\Controller;
-use craigclement\craftbrokenlinks\models\Settings;
 use craigclement\craftbrokenlinks\Plugin;
 use craigclement\craftbrokenlinks\records\ScanHistoryRecord;
 use yii\web\Response;
@@ -186,27 +185,22 @@ class BrokenLinksController extends Controller
     }
 
     /**
-     * Renders the ignore-list settings form (GET) or saves the submitted
-     * ignored URL patterns (POST).
-     *
-     * @throws \yii\base\InvalidConfigException if the plugin settings model is misconfigured.
+     * Renders the ignore-list form (GET) or saves the submitted ignored URL
+     * patterns to the database (POST).
      */
     public function actionSettings(): Response
     {
-        $plugin = Plugin::getInstance();
-        /** @var Settings $settings */
-        $settings = $plugin->getSettings();
+        $service = Plugin::getInstance()->getBrokenLinks();
 
         if ($this->request->getIsPost()) {
             $patterns = (string)$this->request->getBodyParam('ignoredUrlPatterns', '');
-            $lines = array_filter(array_map('trim', explode("\n", $patterns)));
-            $settings->ignoredUrlPatterns = array_values($lines);
+            $lines = explode("\n", $patterns);
 
-            if (!Craft::$app->getPlugins()->savePluginSettings($plugin, $settings->getAttributes())) {
+            if (!$service->saveIgnorePatterns($lines)) {
                 Craft::$app->getSession()->setError(Craft::t('broken-links', 'Couldn’t save settings.'));
 
                 return $this->renderTemplate('brokenlinks/settings', [
-                    'settings' => $settings,
+                    'patterns' => array_values(array_filter(array_map('trim', $lines))),
                 ]);
             }
 
@@ -216,7 +210,7 @@ class BrokenLinksController extends Controller
         }
 
         return $this->renderTemplate('brokenlinks/settings', [
-            'settings' => $settings,
+            'patterns' => $service->getIgnorePatterns(),
         ]);
     }
 
@@ -242,24 +236,16 @@ class BrokenLinksController extends Controller
             return $this->asJson(['success' => false, 'message' => 'Could not parse host from URL.']);
         }
 
-        $plugin = Plugin::getInstance();
-        /** @var \craigclement\craftbrokenlinks\models\Settings $settings */
-        $settings = $plugin->getSettings();
-        $patterns = $settings->ignoredUrlPatterns;
+        $service = Plugin::getInstance()->getBrokenLinks();
 
-        if (!in_array($host, $patterns, true)) {
-            $patterns[] = $host;
-            $settings->ignoredUrlPatterns = $patterns;
-
-            if (!Craft::$app->getPlugins()->savePluginSettings($plugin, $settings->getAttributes())) {
-                return $this->asJson(['success' => false, 'message' => 'Failed to save ignore list.']);
-            }
+        if (!$service->addIgnorePattern($host)) {
+            return $this->asJson(['success' => false, 'message' => 'Failed to save ignore list.']);
         }
 
         // Remove existing broken-link records for this domain so they
         // disappear immediately without waiting for the next scan.
         try {
-            \craigclement\craftbrokenlinks\records\BrokenLinkRecord::deleteAll(['like', 'url', '%' . $host . '%', false]);
+            $service->deleteBrokenLinksForHost($host);
         } catch (\Throwable $e) {
             Craft::error('Error removing ignored links: ' . $e->getMessage(), __METHOD__);
         }

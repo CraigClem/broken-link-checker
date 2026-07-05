@@ -7,7 +7,6 @@ use craft\elements\Entry;
 use craft\helpers\Db;
 use craft\queue\BaseJob;
 use craigclement\craftbrokenlinks\helpers\UrlSafety;
-use craigclement\craftbrokenlinks\models\Settings;
 use craigclement\craftbrokenlinks\Plugin;
 use craigclement\craftbrokenlinks\records\BrokenLinkRecord;
 use craigclement\craftbrokenlinks\records\ScanHistoryRecord;
@@ -62,6 +61,13 @@ class CheckBrokenLinksJob extends BaseJob
      */
     private array $allowedHosts = [];
 
+    /**
+     * Operator-configured URL patterns to skip, loaded once per run.
+     *
+     * @var string[]
+     */
+    private array $ignorePatterns = [];
+
     // Public Methods
     // =========================================================================
 
@@ -86,6 +92,7 @@ class CheckBrokenLinksJob extends BaseJob
         }
 
         $this->allowedHosts = UrlSafety::siteHosts(Craft::$app->getSites()->getAllSites());
+        $this->ignorePatterns = Plugin::getInstance()->getBrokenLinks()->getIgnorePatterns();
 
         $client = new Client([
             'timeout' => 5,
@@ -200,7 +207,7 @@ class CheckBrokenLinksJob extends BaseJob
                 }
 
                 // Skip links the operator has explicitly chosen to ignore.
-                if ($this->_isIgnored($absoluteUrl)) {
+                if ($this->isIgnored($absoluteUrl)) {
                     continue;
                 }
 
@@ -259,24 +266,9 @@ class CheckBrokenLinksJob extends BaseJob
      * @param string $url The absolute URL to test.
      * @return bool Whether the URL should be ignored.
      */
-    private function _isIgnored(string $url): bool
+    private function isIgnored(string $url): bool
     {
-        $plugin = Plugin::getInstance();
-
-        if ($plugin === null) {
-            return false;
-        }
-
-        /** @var Settings $settings */
-        $settings = $plugin->getSettings();
-
-        foreach ($settings->ignoredUrlPatterns as $pattern) {
-            $pattern = trim($pattern);
-
-            if ($pattern === '') {
-                continue;
-            }
-
+        foreach ($this->ignorePatterns as $pattern) {
             if (stripos($url, $pattern) !== false) {
                 return true;
             }

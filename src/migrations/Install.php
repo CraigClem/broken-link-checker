@@ -62,6 +62,17 @@ class Install extends Migration
             'uid' => $this->uid(),
         ]);
 
+        // Create the ignore-patterns table
+        $this->createTable('{{%brokenlinks_ignorepatterns}}', [
+            'id' => $this->primaryKey(),
+            'pattern' => $this->string(255)->notNull(),
+            'dateCreated' => $this->dateTime()->notNull(),
+            'dateUpdated' => $this->dateTime()->notNull(),
+            'uid' => $this->uid(),
+        ]);
+
+        $this->createIndex(null, '{{%brokenlinks_ignorepatterns}}', ['pattern(191)'], true);
+
         return true;
     }
 
@@ -73,6 +84,7 @@ class Install extends Migration
         // Drop the tables if they exist
         $this->dropTableIfExists('{{%brokenlinks_brokenlinks}}');
         $this->dropTableIfExists('{{%brokenlinks_scanhistory}}');
+        $this->dropTableIfExists('{{%brokenlinks_ignorepatterns}}');
 
         return true;
     }

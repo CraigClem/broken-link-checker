@@ -62,6 +62,10 @@ Navigate to **Broken Links** in the CP sidebar. Access requires the **Manage bro
 
 Results can be exported as a **CSV** from the results table.
 
+### Ignore List
+
+Some domains block automated requests (for example with a Cloudflare 403) and show up as noise on every scan. To silence them, click **Ignore** next to a result — the domain is added to the ignore list and its existing records are removed — or manage patterns manually via the **Ignore List** button. One pattern per line; any link URL containing a pattern is skipped during scans. Patterns are stored in the database, so the list works in production regardless of the `allowAdminChanges` setting.
+
 ### Console
 
 ```bash
