@@ -9,6 +9,7 @@ use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\helpers\UrlHelper;
 use craft\i18n\PhpMessageSource;
 use craft\services\Dashboard;
 use craft\services\UserPermissions;
@@ -46,12 +47,14 @@ class Plugin extends BasePlugin
     /**
      * @var string The plugin's schema version, used to track migration state.
      */
-    public string $schemaVersion = '1.1.0';
+    public string $schemaVersion = '1.2.0';
 
     /**
-     * @var bool Whether the plugin has control-panel settings.
+     * @var bool Whether the plugin has control-panel settings. The Settings
+     * link redirects to the ignore-list page; nothing is stored in project
+     * config.
      */
-    public bool $hasCpSettings = false;
+    public bool $hasCpSettings = true;
 
     // Public Methods
     // =========================================================================
@@ -85,6 +88,8 @@ class Plugin extends BasePlugin
                 $event->rules['brokenlinks/scan-status'] = 'brokenlinks/broken-links/scan-status';
                 $event->rules['brokenlinks/clear-data'] = 'brokenlinks/broken-links/clear-data';
                 $event->rules['brokenlinks/export'] = 'brokenlinks/broken-links/export';
+                $event->rules['brokenlinks/settings'] = 'brokenlinks/broken-links/settings';
+                $event->rules['brokenlinks/ignore-url'] = 'brokenlinks/broken-links/ignore-url';
             }
         );
 
@@ -142,6 +147,14 @@ class Plugin extends BasePlugin
         /** @var BrokenLinksService $service */
         $service = $this->get('brokenLinks');
         return $service;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getSettingsResponse(): mixed
+    {
+        return Craft::$app->getResponse()->redirect(UrlHelper::cpUrl('brokenlinks/settings'));
     }
 
     // Private Methods

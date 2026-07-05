@@ -7,6 +7,7 @@ use craft\elements\Entry;
 use craft\helpers\Db;
 use craft\queue\BaseJob;
 use craigclement\craftbrokenlinks\helpers\UrlSafety;
+use craigclement\craftbrokenlinks\Plugin;
 use craigclement\craftbrokenlinks\records\BrokenLinkRecord;
 use craigclement\craftbrokenlinks\records\ScanHistoryRecord;
 use GuzzleHttp\Client;
@@ -60,6 +61,13 @@ class CheckBrokenLinksJob extends BaseJob
      */
     private array $allowedHosts = [];
 
+    /**
+     * Operator-configured URL patterns to skip, loaded once per run.
+     *
+     * @var string[]
+     */
+    private array $ignorePatterns = [];
+
     // Public Methods
     // =========================================================================
 
@@ -84,6 +92,7 @@ class CheckBrokenLinksJob extends BaseJob
         }
 
         $this->allowedHosts = UrlSafety::siteHosts(Craft::$app->getSites()->getAllSites());
+        $this->ignorePatterns = Plugin::getInstance()->getBrokenLinks()->getIgnorePatterns();
 
         $client = new Client([
             'timeout' => 5,
@@ -197,6 +206,11 @@ class CheckBrokenLinksJob extends BaseJob
                     continue;
                 }
 
+                // Skip links the operator has explicitly chosen to ignore.
+                if ($this->isIgnored($absoluteUrl)) {
+                    continue;
+                }
+
                 try {
                     $headResponse = $client->head($absoluteUrl, [
                         'allow_redirects' => [
@@ -243,6 +257,24 @@ class CheckBrokenLinksJob extends BaseJob
         }
 
         return $brokenLinks;
+    }
+
+    /**
+     * Determines whether the given URL matches one of the operator-configured
+     * ignore patterns and should therefore be skipped during the scan.
+     *
+     * @param string $url The absolute URL to test.
+     * @return bool Whether the URL should be ignored.
+     */
+    private function isIgnored(string $url): bool
+    {
+        foreach ($this->ignorePatterns as $pattern) {
+            if (stripos($url, $pattern) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -185,6 +185,75 @@ class BrokenLinksController extends Controller
     }
 
     /**
+     * Renders the ignore-list form (GET) or saves the submitted ignored URL
+     * patterns to the database (POST).
+     */
+    public function actionSettings(): Response
+    {
+        $service = Plugin::getInstance()->getBrokenLinks();
+
+        if ($this->request->getIsPost()) {
+            $patterns = (string)$this->request->getBodyParam('ignoredUrlPatterns', '');
+            $lines = explode("\n", $patterns);
+
+            if (!$service->saveIgnorePatterns($lines)) {
+                Craft::$app->getSession()->setError(Craft::t('broken-links', 'Couldn’t save settings.'));
+
+                return $this->renderTemplate('brokenlinks/settings', [
+                    'patterns' => array_values(array_filter(array_map('trim', $lines))),
+                ]);
+            }
+
+            Craft::$app->getSession()->setNotice(Craft::t('broken-links', 'Settings saved.'));
+
+            return $this->redirectToPostedUrl();
+        }
+
+        return $this->renderTemplate('brokenlinks/settings', [
+            'patterns' => $service->getIgnorePatterns(),
+        ]);
+    }
+
+    /**
+     * Adds the domain of the given URL to the ignored-patterns list and
+     * removes any existing broken-link records for that domain.
+     *
+     * @throws \yii\web\BadRequestHttpException if the request is not a POST request.
+     */
+    public function actionIgnoreUrl(): Response
+    {
+        $this->requirePostRequest();
+
+        $url = (string)Craft::$app->getRequest()->getBodyParam('url', '');
+
+        if ($url === '') {
+            return $this->asJson(['success' => false, 'message' => 'No URL provided.']);
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (!$host) {
+            return $this->asJson(['success' => false, 'message' => 'Could not parse host from URL.']);
+        }
+
+        $service = Plugin::getInstance()->getBrokenLinks();
+
+        if (!$service->addIgnorePattern($host)) {
+            return $this->asJson(['success' => false, 'message' => 'Failed to save ignore list.']);
+        }
+
+        // Remove existing broken-link records for this domain so they
+        // disappear immediately without waiting for the next scan.
+        try {
+            $service->deleteBrokenLinksForHost($host);
+        } catch (\Throwable $e) {
+            Craft::error('Error removing ignored links: ' . $e->getMessage(), __METHOD__);
+        }
+
+        return $this->asJson(['success' => true, 'pattern' => $host]);
+    }
+
+    /**
      * Exports the broken-link results as a downloadable CSV file.
      */
     public function actionExport(): Response

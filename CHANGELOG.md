@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0 - 2026-07-05
+
+### Added
+- Ignore list: skip known-noisy URLs during scans. Add patterns on the new Ignore List page, or click "Ignore" next to a result to silence that domain and remove its existing records ([#1](https://github.com/fell-mere/broken-link-checker/pull/1) — thanks @john-henry!)
+
 ## 1.1.1 - 2026-07-01
 
 ### Fixed
