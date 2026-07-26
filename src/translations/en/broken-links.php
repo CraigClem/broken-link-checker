@@ -21,7 +21,7 @@ return [
     'Scan Status' => 'Scan Status',
     'Start Time' => 'Start Time',
     'End Time' => 'End Time',
-    'URLs Scanned' => 'URLs Scanned',
+    'Pages Scanned' => 'Pages Scanned',
     'Broken Links Found' => 'Broken Links Found',
     
     // Table headers

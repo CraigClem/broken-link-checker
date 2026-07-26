@@ -121,7 +121,10 @@ class CheckBrokenLinksJob extends BaseJob
                 $visitedUrls[$url] = true;
 
                 $brokenLinks = $this->checkPageLinks($client, $url, $entry);
-                $brokenLinkCount += count($brokenLinks);
+
+                // Count unique rows, not save calls — the same dead URL appearing
+                // in several anchors on a page is one stored row, not several.
+                $brokenLinkCount += count(array_unique(array_filter(array_column($brokenLinks, 'id'))));
 
                 $batchFraction = $entryCount > 0 ? ($currentEntry / $entryCount) : 1;
                 $progress = min(1.0, ($this->batchIndex + $batchFraction) / $this->totalBatches);

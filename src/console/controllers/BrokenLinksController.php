@@ -90,7 +90,7 @@ class BrokenLinksController extends Controller
 
                 if ($status === ScanHistoryRecord::STATUS_COMPLETED) {
                     $this->stdout("Scan completed!\n");
-                    $this->stdout("Total URLs scanned: {$scanRecord->totalUrlsScanned}\n");
+                    $this->stdout("Total pages scanned: {$scanRecord->totalUrlsScanned}\n");
                     $this->stdout("Total broken links found: {$scanRecord->totalBrokenLinks}\n");
                     $completed = true;
                     break;
@@ -150,7 +150,7 @@ class BrokenLinksController extends Controller
             $this->stdout("End time: {$endTime}\n");
         }
 
-        $this->stdout("Total URLs scanned: {$scan->totalUrlsScanned}\n");
+        $this->stdout("Total pages scanned: {$scan->totalUrlsScanned}\n");
         $this->stdout("Total broken links found: {$scan->totalBrokenLinks}\n");
 
         return ExitCode::OK;

@@ -32,7 +32,7 @@ class ScanHistory extends Model
     public mixed $endTime = null;
 
     /**
-     * @var int The total number of URLs scanned.
+     * @var int The total number of pages scanned. (Column name kept for BC.)
      */
     public int $totalUrlsScanned = 0;
 

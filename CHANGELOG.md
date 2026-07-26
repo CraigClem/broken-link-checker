@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 - 2026-07-26
+
+### Fixed
+- "Broken Links Found" no longer overstates the total. It counted each check rather than each stored record, so a dead URL linked more than once on the same page was counted more than once
+- The scan no longer counts and queues entries it cannot crawl. Nested Matrix-block entries and entries in sections without URL formats have no URL of their own, so they inflated the reported total and padded the queue with work that was only skipped
+
+### Changed
+- The "URLs Scanned" scan statistic is now labelled "Pages Scanned", which is what it has always counted — the pages crawled, not the individual links checked on them
+
 ## 1.2.0 - 2026-07-05
 
 ### Added

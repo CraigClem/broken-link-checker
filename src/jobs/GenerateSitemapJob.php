@@ -56,7 +56,11 @@ class GenerateSitemapJob extends BaseJob
         $scanRecord->save();
 
         try {
-            $entryQuery = Entry::find();
+            // Only entries with their own URI can be crawled — this excludes
+            // nested Matrix-block entries (entries in Craft 5) and entries in
+            // sections without URL formats, which would otherwise inflate the
+            // reported count and pad the queue batches with skipped work.
+            $entryQuery = Entry::find()->uri(':notempty:');
 
             if (!$this->forceFullScan) {
                 /** @var ScanHistoryRecord|null $lastScan */
